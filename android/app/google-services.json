@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "490854661850",
+    "project_id": "country-game-91d59",
+    "storage_bucket": "country-game-91d59.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:490854661850:android:163fb0fb97d542615cafe3",
+        "android_client_info": {
+          "package_name": "com.example.country_game"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB3UM1QVtW6xM9YB2r93KMsVpNzx532HeI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
