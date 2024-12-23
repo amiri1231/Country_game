@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '/Game/game_screen.dart';
-import 'dart:math'; // For generating random lobby code
+import 'dart:math';
 
 class GameLobbyPage extends StatefulWidget {
   const GameLobbyPage({super.key});
@@ -16,7 +16,6 @@ class _GameLobbyPageState extends State<GameLobbyPage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final TextEditingController lobbyCodeController = TextEditingController();
 
-  // Generate a random 6-character lobby code
   String _generateLobbyCode() {
     const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     Random random = Random();
@@ -40,9 +39,10 @@ class _GameLobbyPageState extends State<GameLobbyPage> {
         'gameStatus': 'waiting'
       });
 
-      Navigator.push(context, MaterialPageRoute(
-        builder: (context) => GameScreen(gameId: gameId),
-      ));
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => GameScreen(gameId: gameId)),
+      );
     }
   }
 
@@ -65,9 +65,10 @@ class _GameLobbyPageState extends State<GameLobbyPage> {
           'gameStatus': 'in_progress'
         });
 
-        Navigator.push(context, MaterialPageRoute(
-          builder: (context) => GameScreen(gameId: gameId),
-        ));
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => GameScreen(gameId: gameId)),
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Invalid Lobby Code')),
@@ -87,22 +88,28 @@ class _GameLobbyPageState extends State<GameLobbyPage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            ElevatedButton(
-              onPressed: _createNewGame,
-              child: const Text('Create New Game'),
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: lobbyCodeController,
-              decoration: const InputDecoration(
-                labelText: 'Enter Lobby Code',
-                border: OutlineInputBorder(),
+            Card(
+              elevation: 5,
+              child: ListTile(
+                title: const Text('Create a New Game'),
+                subtitle: const Text('Generate a new lobby and invite your friends!'),
+                trailing: ElevatedButton(
+                  onPressed: _createNewGame,
+                  child: const Text('Create'),
+                ),
               ),
             ),
             const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () => _joinGameByCode(lobbyCodeController.text.trim()),
-              child: const Text('Join Game'),
+            Card(
+              elevation: 5,
+              child: ListTile(
+                title: const Text('Join a Game'),
+                subtitle: const Text('Enter a lobby code to join an existing game.'),
+                trailing: ElevatedButton(
+                  onPressed: () => _joinGameByCode(lobbyCodeController.text.trim()),
+                  child: const Text('Join'),
+                ),
+              ),
             ),
           ],
         ),

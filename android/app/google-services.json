@@ -2,7 +2,7 @@
   "project_info": {
     "project_number": "490854661850",
     "project_id": "country-game-91d59",
-    "storage_bucket": "country-game-91d59.appspot.com"
+    "storage_bucket": "country-game-91d59.firebasestorage.app"
   },
   "client": [
     {
@@ -12,7 +12,12 @@
           "package_name": "com.example.country_game"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "490854661850-q1iu2v5l4v3cudnhuf79uo4pi7n96f8t.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyB3UM1QVtW6xM9YB2r93KMsVpNzx532HeI"
@@ -20,7 +25,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "490854661850-q1iu2v5l4v3cudnhuf79uo4pi7n96f8t.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "490854661850-t2dhvfgig25504i4ih4i4d6qdt8ph84o.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.countryGame"
+              }
+            }
+          ]
         }
       }
     }

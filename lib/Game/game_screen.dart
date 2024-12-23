@@ -21,15 +21,13 @@ class _GameScreenState extends State<GameScreen> {
   String? currentWord;
   String? currentPlayer;
   List<String> players = [];
-  bool isLoading = false;
-  int roundNumber = 1;
   bool gameOver = false;
-  bool isTimerActive = false;
+  int roundNumber = 1;
 
   TextEditingController guessController = TextEditingController();
   late StreamSubscription _gameStreamSubscription;
-  late Timer _timer;
-  int remainingTime = 50;
+  Timer? _timer;
+  int remainingTime = 20;
 
   @override
   void initState() {
@@ -37,6 +35,7 @@ class _GameScreenState extends State<GameScreen> {
     _initializeGame();
   }
 
+  //start
   Future<void> _initializeGame() async {
     _gameStreamSubscription = _firestore
         .collection('games')
@@ -55,17 +54,22 @@ class _GameScreenState extends State<GameScreen> {
           gameOver = gameData['gameStatus'] == 'finished';
         });
 
-        // start timer
-        if (!isTimerActive && players.length == 2 && currentPlayer == _auth.currentUser?.uid) {
+        // timer
+        if (!gameOver && players.length == 2 && currentPlayer == _auth.currentUser?.uid) {
           _startTimer();
+        } else {
+          _pauseTimer();
         }
       }
     });
   }
 
+  // Start Timer 
   void _startTimer() {
+    _pauseTimer(); 
+
     setState(() {
-      isTimerActive = true;
+      remainingTime = 20; 
     });
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -73,13 +77,19 @@ class _GameScreenState extends State<GameScreen> {
         if (remainingTime > 0) {
           remainingTime--;
         } else {
-          _endTurn();
+          _endGame('Time ran out! You lost the game.');
           timer.cancel();
         }
       });
     });
   }
 
+  // pause Timer
+  void _pauseTimer() {
+    _timer?.cancel();
+  }
+
+  // submit Guess
   Future<void> _submitGuess() async {
     if (guessController.text.isEmpty) return;
 
@@ -90,10 +100,6 @@ class _GameScreenState extends State<GameScreen> {
       final gameRef = _firestore.collection('games').doc(widget.gameId);
       final nextPlayer = players.firstWhere((player) => player != user.uid);
 
-      // paues timer
-      _pauseTimer();
-
-      //update online firestoer
       await gameRef.update({
         'currentWord': guessController.text,
         'currentTurn': nextPlayer,
@@ -101,40 +107,11 @@ class _GameScreenState extends State<GameScreen> {
       });
 
       guessController.clear();
-
-      // resume for next player
-      _resumeTimer();
+      _pauseTimer(); 
     }
   }
 
-  // pause
-  void _pauseTimer() {
-    if (_timer.isActive) {
-      _timer.cancel();
-    }
-    setState(() {
-      isTimerActive = false;
-    });
-  }
-
-  // resume 
-  void _resumeTimer() {
-    setState(() {
-      isTimerActive = true;
-    });
-
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
-        if (remainingTime > 0) {
-          remainingTime--;
-        } else {
-          _endTurn();
-          timer.cancel();
-        }
-      });
-    });
-  }
-
+  // validate Guess functionn
   bool _isGuessValid(String guess) {
     if (guess.isEmpty) return false;
 
@@ -163,16 +140,23 @@ class _GameScreenState extends State<GameScreen> {
     return true;
   }
 
-  void _endTurn() {
+  // End Game
+  void _endGame(String message) {
     setState(() {
-      isTimerActive = false;
+      gameOver = true;
     });
+    _firestore.collection('games').doc(widget.gameId).update({
+      'gameStatus': 'finished',
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   @override
   void dispose() {
     _gameStreamSubscription.cancel();
-    if (_timer.isActive) _timer.cancel();
+    _timer?.cancel();
     super.dispose();
   }
 
@@ -186,7 +170,7 @@ class _GameScreenState extends State<GameScreen> {
       body: Container(
         decoration: BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/background.jpg'),
+            image: AssetImage('assets/whitebg.jpg'),
             fit: BoxFit.cover,
           ),
         ),
@@ -194,69 +178,48 @@ class _GameScreenState extends State<GameScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // show lobby code
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Lobby Code: ${lobbyCode ?? 'Loading...'}',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                ),
-              ],
+            Center(
+              child: Text(
+                'Lobby Code: ${lobbyCode ?? 'Loading...'}',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+              ),
             ),
             const SizedBox(height: 10),
-
-            //show current word
             Center(
               child: Text(
                 'Current Word: ${currentWord?.isEmpty ?? true ? 'No word yet' : currentWord}',
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black),
               ),
             ),
             const SizedBox(height: 20),
-
+            Text('Round: $roundNumber', style: const TextStyle(fontSize: 18, color: Colors.black)),
+            Text('Players: ${players.length} / 2', style: const TextStyle(fontSize: 18, color: Colors.black)),
+            Text('Time Left: $remainingTime seconds', style: const TextStyle(fontSize: 18, color: Colors.black)),
+            const SizedBox(height: 20),
             if (gameOver) ...[
               const Center(
                 child: Text(
                   'Game Over!',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.red),
                 ),
               ),
+            ] else if (currentPlayer == _auth.currentUser?.uid) ...[
+              TextField(
+                controller: guessController,
+                decoration: const InputDecoration(
+                  labelText: 'Your Guess',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _submitGuess,
+                child: const Text('Submit Guess'),
+              ),
             ] else ...[
-              Text('Round: $roundNumber', style: const TextStyle(fontSize: 18, color: Colors.white)),
-              Text('Players: ${players.length} / 2', style: const TextStyle(fontSize: 18, color: Colors.white)),
-              Text('Time Left: $remainingTime seconds', style: const TextStyle(fontSize: 18, color: Colors.white)),
-
-              if (players.length < 2) ...[
-                const Center(
-                  child: Text(
-                    'Waiting for player 2 to join...',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
-                ),
-              ] else if (currentPlayer == _auth.currentUser?.uid) ...[
-                TextField(
-                  controller: guessController,
-                  decoration: const InputDecoration(
-                    labelText: 'Your Guess',
-                    border: OutlineInputBorder(),
-                    labelStyle: TextStyle(color: Colors.white),
-                  ),
-                  style: const TextStyle(fontSize: 18, color: Colors.white),
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: _submitGuess,
-                  child: const Text('Submit Guess'),
-                ),
-              ] else ...[
-                const Center(
-                  child: Text(
-                    'Waiting for other player to guess...',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
-                ),
-              ],
+              const Center(
+                child: Text('Waiting for other player to guess...'),
+              ),
             ],
           ],
         ),
