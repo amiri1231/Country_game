@@ -27,17 +27,16 @@ class _ProfilePageState extends State<ProfilePage> {
     _fetchLocation();
   }
 
-  Future<void> _loadUserProfile() async {
+  Future<void> _loadUserProfile() async { 
     final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final userData = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-      setState(() {
-        _username = userData['username'] ?? 'Guest';
-        _profilePictureUrl = userData['profilePictureUrl'];
-        _country = userData['country'];
-      });
-    }
-  }
+     if (user != null) 
+     { final userData = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      setState(() { _username = user.email;
+      _profilePictureUrl = userData['profilePictureUrl'];
+      _country = userData['country'];
+       });
+        }
+         }
 
   Future<void> _fetchLocation() async {
     bool serviceEnabled;
