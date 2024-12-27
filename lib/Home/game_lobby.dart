@@ -16,6 +16,7 @@ class _GameLobbyPageState extends State<GameLobbyPage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final TextEditingController lobbyCodeController = TextEditingController();
 
+  // lobby code
   String _generateLobbyCode() {
     const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     Random random = Random();
@@ -39,20 +40,20 @@ class _GameLobbyPageState extends State<GameLobbyPage> {
         'gameStatus': 'waiting'
       });
 
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => GameScreen(gameId: gameId)),
-      );
+      Navigator.push(context, MaterialPageRoute(
+        builder: (context) => GameScreen(gameId: gameId),
+      ));
     }
   }
 
-  Future<void> _joinGameByCode(String lobbyCode) async {
+  Future<void> _joinGameByCode() async {
     final user = _auth.currentUser;
+    final code = lobbyCodeController.text.trim();
 
-    if (user != null) {
+    if (user != null && code.isNotEmpty) {
       final querySnapshot = await _firestore
           .collection('games')
-          .where('lobbyCode', isEqualTo: lobbyCode)
+          .where('lobbyCode', isEqualTo: code)
           .limit(1)
           .get();
 
@@ -65,15 +66,18 @@ class _GameLobbyPageState extends State<GameLobbyPage> {
           'gameStatus': 'in_progress'
         });
 
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => GameScreen(gameId: gameId)),
-        );
+        Navigator.push(context, MaterialPageRoute(
+          builder: (context) => GameScreen(gameId: gameId),
+        ));
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Invalid Lobby Code')),
         );
       }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid Lobby Code')),
+      );
     }
   }
 
@@ -88,28 +92,22 @@ class _GameLobbyPageState extends State<GameLobbyPage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            Card(
-              elevation: 5,
-              child: ListTile(
-                title: const Text('Create a New Game'),
-                subtitle: const Text('Generate a new lobby and invite your friends!'),
-                trailing: ElevatedButton(
-                  onPressed: _createNewGame,
-                  child: const Text('Create'),
-                ),
+            ElevatedButton(
+              onPressed: _createNewGame,
+              child: const Text('Create New Game'),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: lobbyCodeController,
+              decoration: const InputDecoration(
+                labelText: 'Enter Lobby Code',
+                border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 20),
-            Card(
-              elevation: 5,
-              child: ListTile(
-                title: const Text('Join a Game'),
-                subtitle: const Text('Enter a lobby code to join an existing game.'),
-                trailing: ElevatedButton(
-                  onPressed: () => _joinGameByCode(lobbyCodeController.text.trim()),
-                  child: const Text('Join'),
-                ),
-              ),
+            ElevatedButton(
+              onPressed: _joinGameByCode,
+              child: const Text('Join Game'),
             ),
           ],
         ),
