@@ -16,6 +16,7 @@ class _FriendsPageState extends State<FriendsPage> {
 
   List<String> friends = [];
   List<String> friendRequests = [];
+  bool isLoading = false;
 
   @override
   void initState() {
@@ -23,81 +24,124 @@ class _FriendsPageState extends State<FriendsPage> {
     _loadFriends();
   }
 
+  // load
   Future<void> _loadFriends() async {
+    setState(() => isLoading = true);
     final user = _auth.currentUser;
     if (user != null) {
       final userDoc = await _firestore.collection('users').doc(user.uid).get();
-      setState(() {
-        friends = List<String>.from(userDoc['friends'] ?? []);
-        friendRequests = List<String>.from(userDoc['friendRequests'] ?? []);
-      });
+      if (userDoc.exists) {
+        setState(() {
+          friends = List<String>.from(userDoc.data()?['friends'] ?? []);
+          friendRequests = List<String>.from(userDoc.data()?['friendRequests'] ?? []);
+        });
+      }
     }
+    setState(() => isLoading = false);
   }
 
-  // send Friend Request
+  // send request
   Future<void> _sendFriendRequest(String friendEmail) async {
-    final user = _auth.currentUser;
-    if (user == null) return;
-
-    final friendQuery = await _firestore
-        .collection('users')
-        .where('email', isEqualTo: friendEmail)
-        .limit(1)
-        .get();
-
-    if (friendQuery.docs.isEmpty) {
+    if (friendEmail.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('User not found')),
+        const SnackBar(content: Text('Please enter an email address')),
       );
       return;
     }
 
-    final friendId = friendQuery.docs.first.id;
+    final user = _auth.currentUser;
+    if (user == null) return;
 
-    await _firestore.collection('users').doc(friendId).update({
-      'friendRequests': FieldValue.arrayUnion([user.uid]),
-    });
+    try {
+      final friendQuery = await _firestore
+          .collection('users')
+          .where('email', isEqualTo: friendEmail)
+          .limit(1)
+          .get();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Friend request sent!')),
-    );
+      if (friendQuery.docs.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User not found')),
+        );
+        return;
+      }
+
+      final friendId = friendQuery.docs.first.id;
+
+      // duplicate check
+      final friendDoc = friendQuery.docs.first.data();
+      if ((friendDoc['friendRequests'] ?? []).contains(user.uid)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Friend request already sent')),
+        );
+        return;
+      }
+
+      await _firestore.collection('users').doc(friendId).update({
+        'friendRequests': FieldValue.arrayUnion([user.uid]),
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Friend request sent!')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
   }
 
-  // accept Friend Request
+  //accept
   Future<void> _acceptFriendRequest(String friendId) async {
     final user = _auth.currentUser;
     if (user == null) return;
 
-    await _firestore.collection('users').doc(user.uid).update({
-      'friendRequests': FieldValue.arrayRemove([friendId]),
-      'friends': FieldValue.arrayUnion([friendId]),
-    });
+    try {
+      await _firestore.runTransaction((transaction) async {
+        final userDocRef = _firestore.collection('users').doc(user.uid);
+        final friendDocRef = _firestore.collection('users').doc(friendId);
 
-    await _firestore.collection('users').doc(friendId).update({
-      'friends': FieldValue.arrayUnion([user.uid]),
-    });
+        transaction.update(userDocRef, {
+          'friendRequests': FieldValue.arrayRemove([friendId]),
+          'friends': FieldValue.arrayUnion([friendId]),
+        });
+        transaction.update(friendDocRef, {
+          'friends': FieldValue.arrayUnion([user.uid]),
+        });
+      });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Friend request accepted!')),
-    );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Friend request accepted!')),
+      );
 
-    _loadFriends();
+      _loadFriends();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
   }
 
-  /// Decline Friend Request
+  // decline
   Future<void> _declineFriendRequest(String friendId) async {
     final user = _auth.currentUser;
     if (user == null) return;
 
-    await _firestore.collection('users').doc(user.uid).update({
-      'friendRequests': FieldValue.arrayRemove([friendId]),
-    });
+    try {
+      await _firestore.collection('users').doc(user.uid).update({
+        'friendRequests': FieldValue.arrayRemove([friendId]),
+      });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Friend request declined.')),
-    );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Friend request declined.')),
+      );
 
-    _loadFriends();
+      _loadFriends();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
   }
 
   @override
@@ -107,69 +151,74 @@ class _FriendsPageState extends State<FriendsPage> {
         title: const Text('Friends'),
         backgroundColor: Colors.blueAccent,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            TextField(
-              controller: _friendEmailController,
-              decoration: const InputDecoration(
-                labelText: 'Friend\'s Email',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: () => _sendFriendRequest(_friendEmailController.text.trim()),
-              child: const Text('Send Friend Request'),
-            ),
-            const Divider(height: 30),
-            const Text(
-              'Friend Requests',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            Expanded(
-              child: ListView.builder(
-                itemCount: friendRequests.length,
-                itemBuilder: (context, index) {
-                  return ListTile(
-                    title: Text(friendRequests[index]),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.check, color: Colors.green),
-                          onPressed: () => _acceptFriendRequest(friendRequests[index]),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close, color: Colors.red),
-                          onPressed: () => _declineFriendRequest(friendRequests[index]),
-                        ),
-                      ],
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _friendEmailController,
+                    decoration: const InputDecoration(
+                      labelText: 'Friend\'s Email',
+                      border: OutlineInputBorder(),
                     ),
-                  );
-                },
+                  ),
+                  const SizedBox(height: 10),
+                  ElevatedButton(
+                    onPressed: () =>
+                        _sendFriendRequest(_friendEmailController.text.trim()),
+                    child: const Text('Send Friend Request'),
+                  ),
+                  const Divider(height: 30),
+                  const Text(
+                    'Friend Requests',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: friendRequests.length,
+                      itemBuilder: (context, index) {
+                        return ListTile(
+                          title: Text(friendRequests[index]),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.check, color: Colors.green),
+                                onPressed: () =>
+                                    _acceptFriendRequest(friendRequests[index]),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close, color: Colors.red),
+                                onPressed: () =>
+                                    _declineFriendRequest(friendRequests[index]),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const Divider(height: 30),
+                  const Text(
+                    'Your Friends',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: friends.length,
+                      itemBuilder: (context, index) {
+                        return ListTile(
+                          title: Text(friends[index]),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
-            const Divider(height: 30),
-            const Text(
-              'Your Friends',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            Expanded(
-              child: ListView.builder(
-                itemCount: friends.length,
-                itemBuilder: (context, index) {
-                  return ListTile(
-                    title: Text(friends[index]),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
